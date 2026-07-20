@@ -189,11 +189,7 @@
       <div class="form-group">
         <label>Zone</label>
         <select id="reg-zone">
-          <option value="">Select zone…</option>
-          <option value="Zone A">Zone A</option>
-          <option value="Zone B">Zone B</option>
-          <option value="Zone C">Zone C</option>
-          <option value="Zone D">Zone D</option>
+          <option value="">Loading zones…</option>
         </select>
       </div>
     </div>
@@ -263,6 +259,25 @@
       showAlert('reg-error', 'Server error. Please try again.', 'error');
     }
   }
+
+  async function loadZones() {
+    try {
+      const res = await fetch('/api/public/zones');
+      if (!res.ok) throw new Error();
+      const zones = await res.json();
+      const sel = document.getElementById('reg-zone');
+      sel.innerHTML = '<option value="">Select zone…</option>' +
+        zones.map(z => `<option value="${esc(z.name)}">${esc(z.name)}</option>`).join('');
+    } catch {
+      document.getElementById('reg-zone').innerHTML = '<option value="">Failed to load zones</option>';
+    }
+  }
+
+  function esc(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  loadZones();
 
   // Allow Enter key
   document.addEventListener('keydown', e => {

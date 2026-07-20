@@ -232,24 +232,24 @@
     </div>
 
     <nav class="nav">
-      <div class="nav-item active" onclick="showPanel('home')">
+      <div class="nav-item active" onclick="showPanel('home', this)">
         <span class="n-icon">🏠</span> Dashboard
       </div>
-      <div class="nav-item" onclick="showPanel('schedules')">
+      <div class="nav-item" onclick="showPanel('schedules', this)">
         <span class="n-icon">📅</span> Water Schedules
       </div>
-      <div class="nav-item" onclick="showPanel('announcements')">
+      <div class="nav-item" onclick="showPanel('announcements', this)">
         <span class="n-icon">📢</span> Announcements
       </div>
 
       <div class="nav-section admin-only">Admin Tools</div>
-      <div class="nav-item admin-only" onclick="showPanel('zones')">
+      <div class="nav-item admin-only" onclick="showPanel('zones', this)">
         <span class="n-icon">🗺️</span> Manage Zones
       </div>
-      <div class="nav-item admin-only" onclick="showPanel('users')">
+      <div class="nav-item admin-only" onclick="showPanel('users', this)">
         <span class="n-icon">👥</span> Users
       </div>
-      <div class="nav-item admin-only" onclick="showPanel('reports')">
+      <div class="nav-item admin-only" onclick="showPanel('reports', this)">
         <span class="n-icon">📊</span> Reports
       </div>
     </nav>
@@ -430,6 +430,7 @@
 <script>
   let currentUser = null;
   let zonesData   = [];
+  let schedulesData = [];
 
   // ── Boot ──────────────────────────────────────────────────────────────────
   async function boot() {
@@ -458,12 +459,14 @@
   const panels = ['home','schedules','announcements','zones','users','reports'];
   const titles  = { home:'Dashboard', schedules:'Water Schedules', announcements:'Announcements', zones:'Manage Zones', users:'Users', reports:'Reports' };
 
-  function showPanel(name) {
+  function showPanel(name, el) {
     panels.forEach(p => {
       document.getElementById(`panel-${p}`).classList.toggle('active', p === name);
     });
-    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-    event?.currentTarget?.classList?.add('active');
+    document.querySelectorAll('.nav-item').forEach(navEl => {
+      const isTarget = el ? (navEl === el) : (navEl.getAttribute('onclick') && navEl.getAttribute('onclick').includes(`'${name}'`));
+      navEl.classList.toggle('active', !!isTarget);
+    });
     document.getElementById('page-title').textContent = titles[name] || name;
 
     if (name === 'schedules')     loadSchedules();
@@ -509,7 +512,7 @@
       <div class="ann-card">
         <div class="ann-title">${esc(a.title)}</div>
         <div class="ann-body">${esc(a.message)}</div>
-        <div class="ann-meta">📍 ${a.target_zone} &nbsp;·&nbsp; ${fmtDate(a.created_at)}</div>
+        <div class="ann-meta">📍 ${esc(a.target_zone)} &nbsp;·&nbsp; ${fmtDate(a.created_at)}</div>
       </div>
     `).join('');
   }
@@ -521,10 +524,10 @@
       document.getElementById('sched-actions-col').style.display = '';
     }
     const r   = await fetch('/api/schedules');
-    const sch = await r.json();
+    schedulesData = await r.json();
     const tb  = document.getElementById('schedules-tbody');
-    if (!sch.length) { tb.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="icon">📅</div>No schedules found.</div></td></tr>'; return; }
-    tb.innerHTML = sch.map(s => `
+    if (!schedulesData.length) { tb.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="icon">📅</div>No schedules found.</div></td></tr>'; return; }
+    tb.innerHTML = schedulesData.map((s, index) => `
       <tr>
         <td><strong>${esc(s.zone_name)}</strong></td>
         <td>${fmtDate(s.start_time)}</td>
@@ -532,7 +535,7 @@
         <td><span class="badge-status badge-${s.status}">${s.status}</span></td>
         <td>${esc(s.notes || '—')}</td>
         ${currentUser.role === 'admin' ? `<td>
-          <button class="btn btn-outline btn-sm" onclick="editSchedule(${JSON.stringify(s).replace(/"/g,'&quot;')})">Edit</button>
+          <button class="btn btn-outline btn-sm" onclick="editScheduleByIndex(${index})">Edit</button>
           <button class="btn btn-danger btn-sm" onclick="deleteSchedule(${s.id})">Del</button>
         </td>` : ''}
       </tr>
@@ -559,15 +562,15 @@
       document.getElementById('sched-edit-id').value  = prefill.id;
       document.getElementById('sched-modal-title').textContent = 'Edit Schedule';
       sel.value = prefill.zone_id;
-      document.getElementById('sched-start').value  = prefill.start_time?.slice(0,16);
-      document.getElementById('sched-end').value    = prefill.end_time?.slice(0,16);
+      document.getElementById('sched-start').value  = prefill.start_time?.replace(' ', 'T').slice(0,16);
+      document.getElementById('sched-end').value    = prefill.end_time?.replace(' ', 'T').slice(0,16);
       document.getElementById('sched-notes').value  = prefill.notes || '';
       document.getElementById('sched-status').value = prefill.status;
     }
     openModal('schedule-modal');
   }
 
-  function editSchedule(s) { openScheduleModal(s); }
+  function editScheduleByIndex(index) { openScheduleModal(schedulesData[index]); }
 
   async function saveSchedule() {
     const id       = document.getElementById('sched-edit-id').value;
@@ -610,7 +613,7 @@
       <div class="ann-card">
         <div class="ann-title">${esc(a.title)}</div>
         <div class="ann-body">${esc(a.message)}</div>
-        <div class="ann-meta">📍 ${a.target_zone} &nbsp;·&nbsp; ${fmtDate(a.created_at)}</div>
+        <div class="ann-meta">📍 ${esc(a.target_zone)} &nbsp;·&nbsp; ${fmtDate(a.created_at)}</div>
       </div>
     `).join('');
   }
@@ -660,8 +663,8 @@
       <tr>
         <td><strong>${esc(u.full_name)}</strong></td>
         <td>${esc(u.email)}</td>
-        <td>${u.zone || '—'}</td>
-        <td>${u.phone || '—'}</td>
+        <td>${esc(u.zone || '—')}</td>
+        <td>${esc(u.phone || '—')}</td>
         <td><span class="badge-status ${u.role==='admin'?'badge-active':'badge-scheduled'}">${u.role}</span></td>
         <td>${fmtDate(u.created_at)}</td>
       </tr>

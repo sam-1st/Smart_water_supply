@@ -6,12 +6,22 @@ const path = require('path');
 const { getDb, query, run } = require('./database');
 
 const app = express();
-const PORT = 3000;
-const JWT_SECRET = 'smart_water_secret_key_2024_change_in_production';
+const PORT = process.env.PORT || 3000;
+const JWT_SECRET = process.env.JWT_SECRET || 'smart_water_secret_key_2024_change_in_production';
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+// Request Logger
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  if (req.method === 'POST' || req.method === 'PUT') {
+    console.log('Body:', { ...req.body, password: req.body.password ? '***' : undefined });
+  }
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ─── Middleware: verify JWT ───────────────────────────────────────────────────
@@ -45,6 +55,9 @@ app.post('/api/auth/register', async (req, res) => {
 
   const existing = query('SELECT id FROM users WHERE email = ?', [email]);
   if (existing.length) return res.status(409).json({ error: 'Email already registered' });
+
+  const zoneCheck = query('SELECT id FROM zones WHERE name = ?', [zone]);
+  if (!zoneCheck.length) return res.status(400).json({ error: 'Invalid service zone selection' });
 
   const hashed = bcrypt.hashSync(password, 10);
   const result = run(
@@ -95,6 +108,11 @@ app.get('/api/auth/me', authMiddleware, (req, res) => {
 
 // ─── ZONES ────────────────────────────────────────────────────────────────────
 app.get('/api/zones', authMiddleware, (req, res) => {
+  const zones = query('SELECT * FROM zones ORDER BY name');
+  res.json(zones);
+});
+
+app.get('/api/public/zones', (req, res) => {
   const zones = query('SELECT * FROM zones ORDER BY name');
   res.json(zones);
 });
@@ -187,6 +205,12 @@ app.get('/api/admin/reports', authMiddleware, adminOnly, (req, res) => {
     GROUP BY z.id, z.name
   `);
   res.json({ totalUsers, totalSchedules, totalAnnouncements, zoneStats });
+});
+
+// Global Error Handler
+app.use((err, req, res, next) => {
+  console.error('🔥 Server Error:', err);
+  res.status(500).json({ error: 'Internal Server Error', details: err.message });
 });
 
 // ─── START ────────────────────────────────────────────────────────────────────

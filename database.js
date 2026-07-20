@@ -97,26 +97,17 @@ function saveDb() {
 }
 
 function query(sql, params = []) {
-  const result = db.exec(sql.replace(/\?/g, () => {
-    const val = params.shift();
-    if (val === null || val === undefined) return 'NULL';
-    if (typeof val === 'number') return val;
-    return `'${String(val).replace(/'/g, "''")}'`;
-  }));
+  const result = db.exec(sql, params);
   if (!result.length) return [];
   const { columns, values } = result[0];
   return values.map(row => Object.fromEntries(columns.map((col, i) => [col, row[i]])));
 }
 
 function run(sql, params = []) {
-  db.run(sql.replace(/\?/g, () => {
-    const val = params.shift();
-    if (val === null || val === undefined) return 'NULL';
-    if (typeof val === 'number') return val;
-    return `'${String(val).replace(/'/g, "''")}'`;
-  }));
+  db.run(sql, params);
   saveDb();
-  return { lastInsertRowid: db.exec("SELECT last_insert_rowid() as id")[0]?.values[0][0] };
+  const res = db.exec("SELECT last_insert_rowid() as id");
+  return { lastInsertRowid: res[0]?.values[0][0] };
 }
 
 module.exports = { getDb, query, run, saveDb };
