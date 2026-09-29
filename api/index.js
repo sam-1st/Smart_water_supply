@@ -27,8 +27,14 @@ app.use(async (req, res, next) => {
     next();
   } catch (err) {
     console.error('DB init failed:', err);
+    let hostHint = '';
+    try {
+      const conn = process.env.POSTGRES_URL || process.env.DATABASE_URL || '';
+      const u = new URL(conn);
+      hostHint = ` (Host: ${u.hostname})`;
+    } catch {}
     res.status(500).json({
-      error: `Database initialization failed: ${err.message || 'Unknown error'}`
+      error: `Database initialization failed: ${err.message || 'Unknown error'}${hostHint}`
     });
   }
 });
