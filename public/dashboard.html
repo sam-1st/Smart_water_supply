@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Maji Smart — Water Supply Dashboard</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      /* ── Palette: deep water vs. dry-season gold ── */
+      --ink-900:   #0b2a3f;
+      --ink-800:   #123a54;
+      --marine-600:#1a5c86;
+      --azure-500: #3390c4;
+      --azure-100: #dcedf6;
+      --sky-50:    #f3f9fc;
+      --paper:     #faf8f2;
+      --paper-in:  #ffffff;
+      --line:      #e4ddca;
+      --line-soft: #eee9db;
+      --gold-600:  #b3801f;
+      --gold-100:  #f6ecd4;
+      --ink-text:  #14293a;
+      --gray-500:  #6b7c8a;
+      --gray-400:  #97a6b2;
+      --success:   #2f7d5b;
+      --success-bg:#e4f2ea;
+      --error:     #b8453a;
+      --error-bg:  #fbeae7;
+      --warning:   #b3801f;
+      --sidebar-w: 252px;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--paper);
+      color: var(--ink-text);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    h1, h2, h3, .brand-word, .stat-card .value {
+      font-family: 'Fraunces', serif;
+      font-optical-sizing: auto;
+    }
+
+    /* ── Layout ── */
+    .layout { display: flex; min-height: 100vh; }
+
+    .sidebar {
+      width: var(--sidebar-w);
+      background:
+        radial-gradient(120% 140% at 0% 0%, rgba(51,144,196,0.28), transparent 55%),
+        var(--ink-900);
+      color: #eaf2f7;
+      display: flex; flex-direction: column;
+      position: fixed; top: 0; left: 0; height: 100vh; z-index: 100;
+      border-right: 1px solid rgba(255,255,255,0.06);
+    }
+    .sidebar-brand {
+      padding: 1.65rem 1.4rem 1.4rem;
+      border-bottom: 1px solid rgba(255,255,255,0.09);
+      display: flex; align-items: center; gap: 0.7rem;
+    }
+    .brand-mark {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: linear-gradient(155deg, var(--azure-500), var(--marine-600));
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 4px 14px rgba(51,144,196,0.35);
+    }
+    .brand-mark svg { width: 19px; height: 19px; }
+    .sidebar-brand h2 { font-size: 1.05rem; font-weight: 600; line-height: 1.25; letter-spacing: 0.01em; }
+    .sidebar-brand p  { font-size: 0.7rem; opacity: 0.55; letter-spacing: 0.04em; text-transform: uppercase; margin-top: 1px; }
+
+    .nav { padding: 1.1rem 0.8rem; flex: 1; }
+    .nav-section {
+      font-size: 0.66rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.1em; color: var(--gold-100); opacity: 0.55;
+      padding: 1.1rem 0.65rem 0.4rem;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 0.7rem;
+      padding: 0.62rem 0.75rem; border-radius: 9px; cursor: pointer;
+      font-size: 0.87rem; font-weight: 500; color: rgba(234,242,247,0.68);
+      transition: background 0.15s, color 0.15s;
+      margin-bottom: 2px; position: relative;
+    }
+    .nav-item svg { width: 17px; height: 17px; flex-shrink: 0; opacity: 0.85; }
+    .nav-item:hover    { background: rgba(255,255,255,0.07); color: #fff; }
+    .nav-item.active   {
+      background: linear-gradient(90deg, rgba(51,144,196,0.28), rgba(51,144,196,0.06));
+      color: #fff;
+    }
+    .nav-item.active::before {
+      content: ''; position: absolute; left: -0.8rem; top: 0.2rem; bottom: 0.2rem;
+      width: 3px; border-radius: 3px; background: var(--gold-600);
+    }
+    .nav-item.admin-only { display: none; }
+
+    .sidebar-user {
+      padding: 1.1rem 1.4rem 1.3rem;
+      border-top: 1px solid rgba(255,255,255,0.09);
+      font-size: 0.8rem;
+    }
+    .sidebar-user .name  { font-weight: 600; color: #fff; }
+    .sidebar-user .role  { opacity: 0.55; font-size: 0.72rem; margin-top: 1px; }
+    .logout-btn {
+      margin-top: 0.7rem; width: 100%; padding: 0.5rem;
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 7px; color: rgba(234,242,247,0.75);
+      font-size: 0.78rem; cursor: pointer; font-family: inherit; font-weight: 500;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .logout-btn:hover { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.2); }
+
+    /* ── Main ── */
+    .main { margin-left: var(--sidebar-w); flex: 1; display: flex; flex-direction: column; }
+
+    .topbar {
+      background: var(--paper-in); border-bottom: 1px solid var(--line);
+      padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 50;
+    }
+    .topbar h1 { font-size: 1.3rem; font-weight: 600; color: var(--ink-900); letter-spacing: -0.01em; }
+    .topbar .badge {
+      background: var(--gold-100); color: var(--gold-600);
+      font-size: 0.7rem; font-weight: 700; padding: 0.28rem 0.75rem;
+      border-radius: 99px; letter-spacing: 0.03em; text-transform: uppercase;
+    }
+
+    .content { padding: 2rem; max-width: 1180px; }
+
+    /* ── Panels ── */
+    .panel { display: none; }
+    .panel.active { display: block; animation: rise 0.35s ease; }
+    @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ── Stat cards ── */
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 1rem; margin-bottom: 1.75rem; }
+    .stat-card {
+      background: var(--paper-in); border-radius: 14px; padding: 1.3rem 1.4rem;
+      border: 1px solid var(--line); position: relative; overflow: hidden;
+    }
+    .stat-card::after {
+      content: ''; position: absolute; right: -18px; bottom: -22px; width: 80px; height: 80px;
+      border-radius: 50%; background: radial-gradient(circle, rgba(51,144,196,0.09), transparent 70%);
+    }
+    .stat-card .label { font-size: 0.76rem; color: var(--gray-500); font-weight: 600; letter-spacing: 0.02em; }
+    .stat-card .value { font-size: 2.1rem; font-weight: 600; color: var(--ink-900); margin: 0.3rem 0; line-height: 1; }
+    .stat-card .sub   { font-size: 0.75rem; color: var(--gray-400); font-family: 'IBM Plex Mono', monospace; }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--paper-in); border-radius: 14px;
+      border: 1px solid var(--line); overflow: hidden; margin-bottom: 1.5rem;
+    }
+    .card-head {
+      padding: 1.05rem 1.35rem; border-bottom: 1px solid var(--line-soft);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .card-head h3 { font-size: 1.02rem; font-weight: 600; color: var(--ink-900); }
+    .card-body { padding: 1.35rem; }
+
+    /* ── Table ── */
+    table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+    th {
+      text-align: left; padding: 0.6rem 0.9rem; font-size: 0.7rem; font-weight: 700;
+      color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.06em;
+      border-bottom: 1px solid var(--line-soft); background: var(--sky-50);
+    }
+    td { padding: 0.75rem 0.9rem; border-bottom: 1px solid var(--line-soft); font-variant-numeric: tabular-nums; }
+    td:nth-child(2), td:nth-child(3) { font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem; color: var(--ink-text); }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--sky-50); }
+
+    /* ── Status badges ── */
+    .badge-status {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      padding: 0.24rem 0.65rem; border-radius: 99px;
+      font-size: 0.7rem; font-weight: 700; letter-spacing: 0.02em;
+    }
+    .badge-status::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .badge-scheduled { background: var(--azure-100); color: var(--marine-600); }
+    .badge-active    { background: var(--success-bg); color: var(--success); }
+    .badge-completed { background: var(--line-soft); color: var(--gray-500); }
+    .badge-cancelled { background: var(--error-bg); color: var(--error); }
+
+    /* ── Buttons ── */
+    .btn {
+      padding: 0.55rem 1.1rem; border-radius: 9px; border: none; cursor: pointer;
+      font-family: inherit; font-size: 0.85rem; font-weight: 600;
+      transition: opacity 0.15s, transform 0.1s, box-shadow 0.15s;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary   { background: var(--marine-600); color: #fff; box-shadow: 0 2px 8px rgba(26,92,134,0.25); }
+    .btn-teal      { background: var(--gold-600);    color: #fff; box-shadow: 0 2px 8px rgba(179,128,31,0.25); }
+    .btn-danger    { background: var(--error);       color: #fff; }
+    .btn-outline   { background: transparent; border: 1.5px solid var(--line); color: var(--gray-500); }
+    .btn:hover     { opacity: 0.9; }
+    .btn-sm        { padding: 0.32rem 0.7rem; font-size: 0.78rem; border-radius: 7px; }
+
+    /* ── Forms ── */
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.4rem; color: var(--ink-900); }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%; padding: 0.62rem 0.85rem;
+      border: 1.5px solid var(--line); border-radius: 9px;
+      font-family: inherit; font-size: 0.875rem; outline: none; color: var(--ink-text);
+      background: var(--paper-in);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      border-color: var(--azure-500);
+      box-shadow: 0 0 0 3px rgba(51,144,196,0.14);
+    }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+    /* ── Announcement cards ── */
+    .ann-card {
+      border: 1px solid var(--line); border-radius: 12px; padding: 1.05rem 1.15rem; margin-bottom: 0.75rem;
+      border-left: 3px solid var(--gold-600);
+      background: linear-gradient(180deg, var(--sky-50), transparent 40%);
+    }
+    .ann-card .ann-title { font-family: 'Fraunces', serif; font-weight: 600; font-size: 0.98rem; margin-bottom: 0.3rem; color: var(--ink-900); }
+    .ann-card .ann-body  { font-size: 0.86rem; color: var(--gray-500); margin-bottom: 0.5rem; line-height: 1.5; }
+    .ann-card .ann-meta  { font-size: 0.7rem; color: var(--gray-400); font-family: 'IBM Plex Mono', monospace; }
+
+    /* ── Alert ── */
+    .alert {
+      padding: 0.7rem 1rem; border-radius: 9px; font-size: 0.83rem;
+      margin-bottom: 1rem; display: none;
+    }
+    .alert.error   { background: var(--error-bg); color: var(--error); border: 1px solid #f0c9c3; }
+    .alert.success { background: var(--success-bg); color: var(--success); border: 1px solid #c3e2d1; }
+    .alert.show    { display: block; }
+
+    /* ── Schedule next-up (user) — signature gauge banner ── */
+    .schedule-banner {
+      background:
+        radial-gradient(140% 180% at 100% 0%, rgba(179,128,31,0.35), transparent 55%),
+        linear-gradient(120deg, var(--ink-900), var(--marine-600));
+      color: white; border-radius: 16px; padding: 1.6rem 1.8rem;
+      margin-bottom: 1.75rem; display: flex; align-items: center; gap: 1.5rem;
+      position: relative; overflow: hidden;
+    }
+    .gauge-wrap { flex-shrink: 0; width: 76px; height: 76px; }
+    .gauge-wrap svg { width: 76px; height: 76px; }
+    .gauge-track { fill: none; stroke: rgba(255,255,255,0.18); stroke-width: 6; }
+    .gauge-fill  { fill: none; stroke: #f0c869; stroke-width: 6; stroke-linecap: round;
+      stroke-dasharray: 210; stroke-dashoffset: 55; transform: rotate(-90deg); transform-origin: 50% 50%;
+      filter: drop-shadow(0 0 5px rgba(240,200,105,0.5));
+    }
+    .gauge-drop { font-size: 1.35rem; }
+    .schedule-banner h2    { font-size: 1.2rem; font-weight: 600; margin-bottom: 0.3rem; letter-spacing: -0.01em; }
+    .schedule-banner p     { font-size: 0.87rem; opacity: 0.82; font-family: 'IBM Plex Mono', monospace; }
+
+    .empty-state { text-align: center; padding: 3.25rem 1rem; color: var(--gray-400); font-size: 0.9rem; }
+    .empty-state .icon { margin-bottom: 0.75rem; opacity: 0.5; }
+    .empty-state .icon svg { width: 34px; height: 34px; }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(11,42,63,0.5); backdrop-filter: blur(2px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 200; display: none;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--paper-in); border-radius: 16px;
+      width: 100%; max-width: 480px; padding: 1.85rem;
+      max-height: 90vh; overflow-y: auto;
+      box-shadow: 0 24px 70px rgba(11,42,63,0.28);
+      border: 1px solid var(--line-soft);
+    }
+    .modal h3 { font-size: 1.12rem; font-weight: 600; margin-bottom: 1.3rem; color: var(--ink-900); }
+    .modal-actions { display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.3rem; }
+  </style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 2C12 2 5 11.5 5 16a7 7 0 0014 0c0-4.5-7-14-7-14z" fill="#fff"/></svg>
+      </div>
+      <div><h2>Maji Smart</h2><p>Supply &amp; Notices</p></div>
+    </div>
+
+    <nav class="nav">
+      <div class="nav-item active" onclick="showPanel('home')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
+        Dashboard
+      </div>
+      <div class="nav-item" onclick="showPanel('schedules')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="16" rx="2.5"/><path d="M3.5 9.5h17M8 3v3M16 3v3"/></svg>
+        Water Schedules
+      </div>
+      <div class="nav-item" onclick="showPanel('announcements')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4a1 1 0 001 1h2l4 4V5L7 9H5a1 1 0 00-1 1z"/><path d="M16 8a5 5 0 010 8"/></svg>
+        Announcements
+      </div>
+
+      <div class="nav-section admin-only">Admin Tools</div>
+      <div class="nav-item admin-only" onclick="showPanel('zones')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3l6 2.2 6-2.2v15l-6 2.2-6-2.2-6 2.2V5.2z"/><path d="M9 3v15M15 5.2v15"/></svg>
+        Manage Zones
+      </div>
+      <div class="nav-item admin-only" onclick="showPanel('users')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.3"/><path d="M2.5 20c0-3.6 3-6 6.5-6s6.5 2.4 6.5 6"/><circle cx="17.5" cy="8.5" r="2.6"/><path d="M15.5 14.3c2.6.4 4.7 2.4 4.7 5.3"/></svg>
+        Users
+      </div>
+      <div class="nav-item admin-only" onclick="showPanel('reports')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M11 20V4M18 20v-7"/></svg>
+        Reports
+      </div>
+    </nav>
+
+    <div class="sidebar-user">
+      <div class="name" id="sb-name">—</div>
+      <div class="role" id="sb-role">—</div>
+      <button class="logout-btn" onclick="logout()">Sign Out</button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <header class="topbar">
+      <h1 id="page-title">Dashboard</h1>
+      <span class="badge" id="user-zone-badge"></span>
+    </header>
+
+    <div class="content">
+
+      <!-- ── HOME PANEL ── -->
+      <div class="panel active" id="panel-home">
+        <div id="home-user-banner" class="schedule-banner" style="display:none">
+          <div class="gauge-wrap">
+            <svg viewBox="0 0 76 76">
+              <circle class="gauge-track" cx="38" cy="38" r="33.5"/>
+              <circle class="gauge-fill" cx="38" cy="38" r="33.5"/>
+              <text x="38" y="44" text-anchor="middle" font-size="22" class="gauge-drop">💧</text>
+            </svg>
+          </div>
+          <div>
+            <h2 id="next-schedule-label">No upcoming schedule</h2>
+            <p id="next-schedule-detail"></p>
+          </div>
+        </div>
+        <div class="stat-grid" id="home-stats"></div>
+        <div class="card" id="recent-ann-card">
+          <div class="card-head"><h3>Recent Announcements</h3></div>
+          <div class="card-body" id="home-announcements"></div>
+        </div>
+      </div>
+
+      <!-- ── SCHEDULES PANEL ── -->
+      <div class="panel" id="panel-schedules">
+        <div id="admin-schedule-controls" style="display:none; margin-bottom:1rem;">
+          <button class="btn btn-primary" onclick="openScheduleModal()">+ Add Schedule</button>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Water Schedules</h3></div>
+          <div class="card-body" style="padding:0; overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Zone</th><th>Start</th><th>End</th><th>Status</th><th>Notes</th>
+                  <th id="sched-actions-col" style="display:none">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="schedules-tbody">
+                <tr><td colspan="6" class="empty-state">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ANNOUNCEMENTS PANEL ── -->
+      <div class="panel" id="panel-announcements">
+        <div id="admin-ann-controls" style="display:none; margin-bottom:1rem;">
+          <button class="btn btn-teal" onclick="openAnnModal()">+ Send Announcement</button>
+        </div>
+        <div id="announcements-list"></div>
+      </div>
+
+      <!-- ── ZONES PANEL (admin) ── -->
+      <div class="panel" id="panel-zones">
+        <div class="card">
+          <div class="card-head"><h3>Service Zones</h3></div>
+          <div class="card-body" style="padding:0; overflow-x:auto;">
+            <table>
+              <thead><tr><th>Zone Name</th><th>Description</th><th>Created</th></tr></thead>
+              <tbody id="zones-tbody"><tr><td colspan="3" class="empty-state">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── USERS PANEL (admin) ── -->
+      <div class="panel" id="panel-users">
+        <div class="card">
+          <div class="card-head"><h3>Registered Users</h3></div>
+          <div class="card-body" style="padding:0; overflow-x:auto;">
+            <table>
+              <thead><tr><th>Name</th><th>Email</th><th>Zone</th><th>Phone</th><th>Role</th><th>Joined</th></tr></thead>
+              <tbody id="users-tbody"><tr><td colspan="6" class="empty-state">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── REPORTS PANEL (admin) ── -->
+      <div class="panel" id="panel-reports">
+        <div class="stat-grid" id="report-stats"></div>
+        <div class="card">
+          <div class="card-head"><h3>Schedules per Zone</h3></div>
+          <div class="card-body" style="padding:0; overflow-x:auto;">
+            <table>
+              <thead><tr><th>Zone</th><th>Total Schedules</th></tr></thead>
+              <tbody id="zone-stats-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /layout -->
+
+<!-- ── SCHEDULE MODAL ── -->
+<div class="modal-overlay" id="schedule-modal">
+  <div class="modal">
+    <h3 id="sched-modal-title">Add Water Schedule</h3>
+    <div class="alert error" id="sched-modal-error"></div>
+    <input type="hidden" id="sched-edit-id" />
+    <div class="form-group">
+      <label>Zone</label>
+      <select id="sched-zone-select"></select>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Start Date & Time</label>
+        <input type="datetime-local" id="sched-start" />
+      </div>
+      <div class="form-group">
+        <label>End Date & Time</label>
+        <input type="datetime-local" id="sched-end" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Status</label>
+      <select id="sched-status">
+        <option value="scheduled">Scheduled</option>
+        <option value="active">Active</option>
+        <option value="completed">Completed</option>
+        <option value="cancelled">Cancelled</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Notes (optional)</label>
+      <textarea id="sched-notes" rows="2" placeholder="Any notes…"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('schedule-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSchedule()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── ANNOUNCEMENT MODAL ── -->
+<div class="modal-overlay" id="ann-modal">
+  <div class="modal">
+    <h3>Send Announcement</h3>
+    <div class="alert error" id="ann-modal-error"></div>
+    <div class="form-group">
+      <label>Title</label>
+      <input type="text" id="ann-title" placeholder="Announcement title" />
+    </div>
+    <div class="form-group">
+      <label>Message</label>
+      <textarea id="ann-message" rows="4" placeholder="Write your message here…"></textarea>
+    </div>
+    <div class="form-group">
+      <label>Target Zone</label>
+      <select id="ann-zone">
+        <option value="all">All Zones</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('ann-modal')">Cancel</button>
+      <button class="btn btn-teal" onclick="saveAnnouncement()">Send</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let currentUser = null;
+  let zonesData   = [];
+
+  // ── Boot ──────────────────────────────────────────────────────────────────
+  async function boot() {
+    try {
+      const res = await fetch('/api/auth/me');
+      if (!res.ok) return (window.location.href = '/');
+      currentUser = await res.json();
+      applyUserContext();
+      loadHomePanel();
+    } catch {
+      window.location.href = '/';
+    }
+  }
+
+  function applyUserContext() {
+    document.getElementById('sb-name').textContent  = currentUser.full_name;
+    document.getElementById('sb-role').textContent  = currentUser.role === 'admin' ? '🔑 Administrator' : `📍 ${currentUser.zone}`;
+    document.getElementById('user-zone-badge').textContent = currentUser.role === 'admin' ? 'Admin' : currentUser.zone;
+
+    if (currentUser.role === 'admin') {
+      document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
+    }
+  }
+
+  // ── Panels ────────────────────────────────────────────────────────────────
+  const panels = ['home','schedules','announcements','zones','users','reports'];
+  const titles  = { home:'Dashboard', schedules:'Water Schedules', announcements:'Announcements', zones:'Manage Zones', users:'Users', reports:'Reports' };
+
+  function showPanel(name) {
+    panels.forEach(p => {
+      document.getElementById(`panel-${p}`).classList.toggle('active', p === name);
+    });
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+    event?.currentTarget?.classList?.add('active');
+    document.getElementById('page-title').textContent = titles[name] || name;
+
+    if (name === 'schedules')     loadSchedules();
+    if (name === 'announcements') loadAnnouncements();
+    if (name === 'zones')         loadZones();
+    if (name === 'users')         loadUsers();
+    if (name === 'reports')       loadReports();
+  }
+
+  // ── Home ──────────────────────────────────────────────────────────────────
+  async function loadHomePanel() {
+    await loadZonesData();
+
+    if (currentUser.role === 'admin') {
+      const r   = await fetch('/api/admin/reports');
+      const rep = await r.json();
+      document.getElementById('home-stats').innerHTML = `
+        <div class="stat-card"><div class="label">Registered Users</div><div class="value">${rep.totalUsers}</div></div>
+        <div class="stat-card"><div class="label">Total Schedules</div><div class="value">${rep.totalSchedules}</div></div>
+        <div class="stat-card"><div class="label">Announcements</div><div class="value">${rep.totalAnnouncements}</div></div>
+        <div class="stat-card"><div class="label">Zones</div><div class="value">${zonesData.length}</div></div>
+      `;
+    } else {
+      document.getElementById('home-user-banner').style.display = 'flex';
+      const sr   = await fetch('/api/schedules');
+      const sch  = await sr.json();
+      const next = sch.find(s => s.status === 'scheduled' && new Date(s.start_time) > new Date());
+      if (next) {
+        document.getElementById('next-schedule-label').textContent = `Next water supply: ${next.zone_name}`;
+        document.getElementById('next-schedule-detail').textContent =
+          `${fmtDate(next.start_time)} → ${fmtDate(next.end_time)}`;
+      } else {
+        document.getElementById('next-schedule-label').textContent = 'No upcoming schedules';
+        document.getElementById('next-schedule-detail').textContent = 'Check back later.';
+      }
+    }
+
+    const ar  = await fetch('/api/announcements');
+    const ann = await ar.json();
+    const container = document.getElementById('home-announcements');
+    if (!ann.length) { container.innerHTML = '<div class="empty-state"><div class="icon">📭</div>No announcements yet.</div>'; return; }
+    container.innerHTML = ann.slice(0,3).map(a => `
+      <div class="ann-card">
+        <div class="ann-title">${esc(a.title)}</div>
+        <div class="ann-body">${esc(a.message)}</div>
+        <div class="ann-meta">📍 ${a.target_zone} &nbsp;·&nbsp; ${fmtDate(a.created_at)}</div>
+      </div>
+    `).join('');
+  }
+
+  // ── Schedules ─────────────────────────────────────────────────────────────
+  async function loadSchedules() {
+    if (currentUser.role === 'admin') {
+      document.getElementById('admin-schedule-controls').style.display = '';
+      document.getElementById('sched-actions-col').style.display = '';
+    }
+    const r   = await fetch('/api/schedules');
+    const sch = await r.json();
+    const tb  = document.getElementById('schedules-tbody');
+    if (!sch.length) { tb.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="icon">📅</div>No schedules found.</div></td></tr>'; return; }
+    tb.innerHTML = sch.map(s => `
+      <tr>
+        <td><strong>${esc(s.zone_name)}</strong></td>
+        <td>${fmtDate(s.start_time)}</td>
+        <td>${fmtDate(s.end_time)}</td>
+        <td><span class="badge-status badge-${s.status}">${s.status}</span></td>
+        <td>${esc(s.notes || '—')}</td>
+        ${currentUser.role === 'admin' ? `<td>
+          <button class="btn btn-outline btn-sm" onclick="editSchedule(${JSON.stringify(s).replace(/"/g,'&quot;')})">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteSchedule(${s.id})">Del</button>
+        </td>` : ''}
+      </tr>
+    `).join('');
+  }
+
+  async function loadZonesData() {
+    const r = await fetch('/api/zones');
+    zonesData = await r.json();
+  }
+
+  function openScheduleModal(prefill = null) {
+    document.getElementById('sched-edit-id').value = '';
+    document.getElementById('sched-modal-title').textContent = 'Add Water Schedule';
+    document.getElementById('sched-start').value = '';
+    document.getElementById('sched-end').value   = '';
+    document.getElementById('sched-notes').value = '';
+    document.getElementById('sched-status').value = 'scheduled';
+
+    const sel = document.getElementById('sched-zone-select');
+    sel.innerHTML = zonesData.map(z => `<option value="${z.id}">${esc(z.name)}</option>`).join('');
+
+    if (prefill) {
+      document.getElementById('sched-edit-id').value  = prefill.id;
+      document.getElementById('sched-modal-title').textContent = 'Edit Schedule';
+      sel.value = prefill.zone_id;
+      document.getElementById('sched-start').value  = prefill.start_time?.slice(0,16);
+      document.getElementById('sched-end').value    = prefill.end_time?.slice(0,16);
+      document.getElementById('sched-notes').value  = prefill.notes || '';
+      document.getElementById('sched-status').value = prefill.status;
+    }
+    openModal('schedule-modal');
+  }
+
+  function editSchedule(s) { openScheduleModal(s); }
+
+  async function saveSchedule() {
+    const id       = document.getElementById('sched-edit-id').value;
+    const zone_id  = document.getElementById('sched-zone-select').value;
+    const start    = document.getElementById('sched-start').value;
+    const end      = document.getElementById('sched-end').value;
+    const notes    = document.getElementById('sched-notes').value;
+    const status   = document.getElementById('sched-status').value;
+    if (!zone_id || !start || !end) return showModalAlert('sched-modal-error','Fill in zone, start and end times.','error');
+
+    const method = id ? 'PUT' : 'POST';
+    const url    = id ? `/api/schedules/${id}` : '/api/schedules';
+    const res    = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ zone_id, start_time: start, end_time: end, notes, status })
+    });
+    const data = await res.json();
+    if (!res.ok) return showModalAlert('sched-modal-error', data.error, 'error');
+    closeModal('schedule-modal');
+    loadSchedules();
+  }
+
+  async function deleteSchedule(id) {
+    if (!confirm('Delete this schedule?')) return;
+    await fetch(`/api/schedules/${id}`, { method: 'DELETE' });
+    loadSchedules();
+  }
+
+  // ── Announcements ─────────────────────────────────────────────────────────
+  async function loadAnnouncements() {
+    if (currentUser.role === 'admin') {
+      document.getElementById('admin-ann-controls').style.display = '';
+    }
+    const r   = await fetch('/api/announcements');
+    const ann = await r.json();
+    const container = document.getElementById('announcements-list');
+    if (!ann.length) { container.innerHTML = '<div class="empty-state"><div class="icon">📭</div>No announcements yet.</div>'; return; }
+    container.innerHTML = ann.map(a => `
+      <div class="ann-card">
+        <div class="ann-title">${esc(a.title)}</div>
+        <div class="ann-body">${esc(a.message)}</div>
+        <div class="ann-meta">📍 ${a.target_zone} &nbsp;·&nbsp; ${fmtDate(a.created_at)}</div>
+      </div>
+    `).join('');
+  }
+
+  function openAnnModal() {
+    document.getElementById('ann-title').value   = '';
+    document.getElementById('ann-message').value = '';
+    const sel = document.getElementById('ann-zone');
+    sel.innerHTML = `<option value="all">All Zones</option>` +
+      zonesData.map(z => `<option value="${esc(z.name)}">${esc(z.name)}</option>`).join('');
+    openModal('ann-modal');
+  }
+
+  async function saveAnnouncement() {
+    const title       = document.getElementById('ann-title').value.trim();
+    const message     = document.getElementById('ann-message').value.trim();
+    const target_zone = document.getElementById('ann-zone').value;
+    if (!title || !message) return showModalAlert('ann-modal-error','Title and message are required.','error');
+    const res  = await fetch('/api/announcements', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, message, target_zone })
+    });
+    const data = await res.json();
+    if (!res.ok) return showModalAlert('ann-modal-error', data.error, 'error');
+    closeModal('ann-modal');
+    loadAnnouncements();
+  }
+
+  // ── Zones ─────────────────────────────────────────────────────────────────
+  async function loadZones() {
+    await loadZonesData();
+    const tb = document.getElementById('zones-tbody');
+    tb.innerHTML = zonesData.map(z => `
+      <tr>
+        <td><strong>${esc(z.name)}</strong></td>
+        <td>${esc(z.description || '—')}</td>
+        <td>${fmtDate(z.created_at)}</td>
+      </tr>
+    `).join('');
+  }
+
+  // ── Users ─────────────────────────────────────────────────────────────────
+  async function loadUsers() {
+    const r     = await fetch('/api/admin/users');
+    const users = await r.json();
+    document.getElementById('users-tbody').innerHTML = users.map(u => `
+      <tr>
+        <td><strong>${esc(u.full_name)}</strong></td>
+        <td>${esc(u.email)}</td>
+        <td>${u.zone || '—'}</td>
+        <td>${u.phone || '—'}</td>
+        <td><span class="badge-status ${u.role==='admin'?'badge-active':'badge-scheduled'}">${u.role}</span></td>
+        <td>${fmtDate(u.created_at)}</td>
+      </tr>
+    `).join('');
+  }
+
+  // ── Reports ───────────────────────────────────────────────────────────────
+  async function loadReports() {
+    const r   = await fetch('/api/admin/reports');
+    const rep = await r.json();
+    document.getElementById('report-stats').innerHTML = `
+      <div class="stat-card"><div class="label">Total Users</div><div class="value">${rep.totalUsers}</div></div>
+      <div class="stat-card"><div class="label">Total Schedules</div><div class="value">${rep.totalSchedules}</div></div>
+      <div class="stat-card"><div class="label">Announcements</div><div class="value">${rep.totalAnnouncements}</div></div>
+    `;
+    document.getElementById('zone-stats-tbody').innerHTML = rep.zoneStats.map(z => `
+      <tr><td>${esc(z.name)}</td><td>${z.schedule_count}</td></tr>
+    `).join('');
+  }
+
+  // ── Auth ──────────────────────────────────────────────────────────────────
+  async function logout() {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    window.location.href = '/';
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function openModal(id)  { document.getElementById(id).classList.add('open'); }
+  function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+  function showModalAlert(id, msg, type) {
+    const el = document.getElementById(id);
+    el.textContent = msg; el.className = `alert ${type} show`;
+  }
+
+  function fmtDate(str) {
+    if (!str) return '—';
+    return new Date(str).toLocaleString('en-KE', { dateStyle: 'medium', timeStyle: 'short' });
+  }
+
+  function esc(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // Close modal on overlay click
+  document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('open'); });
+  });
+
+  boot();
+</script>
+</body>
+</html>
