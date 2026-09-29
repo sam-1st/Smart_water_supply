@@ -16,12 +16,20 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 // Make sure tables exist / are seeded before handling any request.
 // Cheap no-op after the first warm invocation (see lib/db.js).
 app.use(async (req, res, next) => {
+  if (!process.env.POSTGRES_URL && !process.env.DATABASE_URL) {
+    return res.status(500).json({
+      error: 'Database connection missing: POSTGRES_URL is not set. Please connect a Postgres database in your Vercel project dashboard.'
+    });
+  }
+
   try {
     await ensureSchema();
     next();
   } catch (err) {
     console.error('DB init failed:', err);
-    res.status(500).json({ error: 'Database initialization failed' });
+    res.status(500).json({
+      error: `Database initialization failed: ${err.message || 'Unknown error'}`
+    });
   }
 });
 
