@@ -71,3 +71,17 @@ Because this now uses a real always-on database instead of a local file,
 data survives redeploys, cold starts, and scaling to multiple instances —
 none of which was true of the SQLite-file version. This is the more
 "production-correct" version of the two paths.
+
+## 💧 Meter Readings & Automated Billing
+
+- **Member Self-Read Submission**: Members can input their current water meter reading ($m^3$) with optional meter serial number and notes.
+- **Tiered Tariff Calculation**:
+  - Base monthly service fee: KSh 50.00
+  - Tier 1 (0 – 6 $m^3$ Lifeline): KSh 45.00 / $m^3$
+  - Tier 2 (7 – 20 $m^3$ Normal Domestic): KSh 65.00 / $m^3$
+  - Tier 3 (21 – 50 $m^3$ High Domestic): KSh 85.00 / $m^3$
+  - Tier 4 (> 50 $m^3$ Heavy/Commercial): KSh 110.00 / $m^3$
+- **Instant Official Reply & Statement**: Upon submission, members immediately receive an official utility statement and notification detailing previous reading, current reading, net volume consumed ($m^3$), itemized charges, total amount due, payment due date (14 days), and M-Pesa Paybill instructions (Paybill 247247, Account WAT-{id}).
+- **Payments**: Members can simulate M-Pesa payments or pay directly from their dashboard.
+- **Admin Management**: Administrators can monitor all meter readings and bills across zones, track revenue metrics, filter by payment status, and toggle bill settlement status.
+

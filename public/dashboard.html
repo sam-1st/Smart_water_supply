@@ -281,6 +281,57 @@
     }
     .modal h3 { font-size: 1.12rem; font-weight: 600; margin-bottom: 1.3rem; color: var(--ink-900); }
     .modal-actions { display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.3rem; }
+
+    /* ── Meter & Billing Styles ── */
+    .calc-preview {
+      background: var(--sky-50); border: 1.5px dashed var(--azure-500); border-radius: 12px;
+      padding: 1rem 1.25rem; margin-top: 1rem; margin-bottom: 1.25rem;
+    }
+    .calc-preview-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem; }
+    .calc-preview-head span { font-size: 0.8rem; font-weight: 700; color: var(--marine-600); text-transform: uppercase; letter-spacing: 0.05em; }
+    .calc-preview-rows { font-size: 0.84rem; display: grid; gap: 0.35rem; }
+    .calc-preview-row { display: flex; justify-content: space-between; color: var(--ink-text); }
+    .calc-preview-total {
+      display: flex; justify-content: space-between; font-weight: 700; font-size: 1.05rem;
+      border-top: 1px solid var(--line); padding-top: 0.5rem; margin-top: 0.4rem; color: var(--ink-900);
+    }
+    .reply-card {
+      background: linear-gradient(135deg, #f9fbfd, #eef6fa);
+      border: 1.5px solid var(--azure-500); border-radius: 14px; padding: 1.35rem;
+      margin-bottom: 1.5rem; position: relative;
+    }
+    .reply-card-badge {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      background: var(--marine-600); color: white; padding: 0.25rem 0.65rem;
+      border-radius: 99px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.03em;
+      text-transform: uppercase; margin-bottom: 0.75rem;
+    }
+    .reply-message-box {
+      background: white; border: 1px solid var(--line); border-radius: 10px;
+      padding: 1rem 1.15rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.83rem;
+      line-height: 1.6; color: var(--ink-900); white-space: pre-line; word-break: break-word;
+      margin: 0.75rem 0; border-left: 4px solid var(--marine-600);
+    }
+    .invoice-card {
+      background: white; border: 1px solid var(--line); border-radius: 14px;
+      padding: 1.5rem; color: var(--ink-900);
+    }
+    .invoice-header { display: flex; justify-content: space-between; border-bottom: 2px solid var(--line-soft); padding-bottom: 1rem; margin-bottom: 1rem; }
+    .invoice-title { font-family: 'Fraunces', serif; font-size: 1.25rem; font-weight: 700; color: var(--ink-900); }
+    .invoice-meta { font-size: 0.78rem; color: var(--gray-500); font-family: 'IBM Plex Mono', monospace; text-align: right; }
+    .invoice-total-highlight {
+      background: var(--gold-100); border-radius: 10px; padding: 1rem; text-align: center;
+      margin: 1.2rem 0; border: 1px solid #ebd9ab;
+    }
+    .invoice-total-highlight .label { font-size: 0.78rem; text-transform: uppercase; font-weight: 700; color: var(--gold-600); }
+    .invoice-total-highlight .amount { font-family: 'Fraunces', serif; font-size: 2rem; font-weight: 700; color: var(--ink-900); }
+    .paybill-box {
+      background: var(--sky-50); border: 1px solid var(--azure-100); border-radius: 10px;
+      padding: 0.85rem 1rem; font-size: 0.82rem; margin-bottom: 1rem;
+    }
+    .paybill-box strong { color: var(--marine-600); }
+    .badge-paid { background: var(--success-bg); color: var(--success); }
+    .badge-unpaid { background: var(--error-bg); color: var(--error); }
   </style>
 </head>
 <body>
@@ -309,8 +360,16 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4a1 1 0 001 1h2l4 4V5L7 9H5a1 1 0 00-1 1z"/><path d="M16 8a5 5 0 010 8"/></svg>
         Announcements
       </div>
+      <div class="nav-item" onclick="showPanel('meter')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+        Meter &amp; Billing
+      </div>
 
       <div class="nav-section admin-only">Admin Tools</div>
+      <div class="nav-item admin-only" onclick="showPanel('admin-bills')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M7 15h0M2 10h20"/></svg>
+        Meter &amp; Billing Mgmt
+      </div>
       <div class="nav-item admin-only" onclick="showPanel('zones')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3l6 2.2 6-2.2v15l-6 2.2-6-2.2-6 2.2V5.2z"/><path d="M9 3v15M15 5.2v15"/></svg>
         Manage Zones
@@ -432,6 +491,202 @@
             </table>
           </div>
         </div>
+      <!-- ── METER & BILLING PANEL (member) ── -->
+      <div class="panel" id="panel-meter">
+
+        <!-- Latest Bill Notice / Official Reply Card -->
+        <div id="latest-bill-notice-card" class="reply-card" style="display:none;">
+          <div class="reply-card-badge">📢 Official Bill Reply &amp; Notice</div>
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:0.5rem;">
+            <div>
+              <h3 style="font-family:'Fraunces',serif; font-size:1.15rem; color:var(--ink-900);" id="latest-reply-heading">Latest Water Bill Generated</h3>
+              <p style="font-size:0.78rem; color:var(--gray-500); font-family:'IBM Plex Mono',monospace;" id="latest-reply-date"></p>
+            </div>
+            <div style="text-align:right;">
+              <span id="latest-reply-status" class="badge-status"></span>
+              <div style="font-family:'Fraunces',serif; font-size:1.6rem; font-weight:700; color:var(--marine-600); margin-top:0.25rem;" id="latest-reply-amount"></div>
+            </div>
+          </div>
+
+          <div class="reply-message-box" id="latest-reply-text"></div>
+
+          <div style="display:flex; gap:0.75rem; flex-wrap:wrap; align-items:center; margin-top:0.9rem;">
+            <button class="btn btn-primary" id="latest-reply-pay-btn" onclick="openMpesaPayModalFromLatest()">Pay via M-Pesa</button>
+            <button class="btn btn-outline" onclick="openInvoiceModalFromLatest()">View Official Breakdown &amp; Receipt</button>
+            <span style="font-size:0.78rem; color:var(--gray-500); font-family:'IBM Plex Mono',monospace;">Paybill: <strong>247247</strong> &nbsp;|&nbsp; Acc: <strong id="latest-reply-acc"></strong></span>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:1.5rem; align-items:start; margin-bottom:1.5rem;">
+          
+          <!-- Submit Meter Reading Form Card -->
+          <div class="card" style="margin-bottom:0;">
+            <div class="card-head">
+              <h3>Submit Water Meter Reading</h3>
+              <span style="font-size:0.75rem; color:var(--gray-500); font-family:'IBM Plex Mono',monospace;">Monthly Self-Read</span>
+            </div>
+            <div class="card-body">
+              <div class="alert" id="meter-form-alert"></div>
+              
+              <!-- Previous Reading Info -->
+              <div style="background:var(--sky-50); border:1px solid var(--azure-100); border-radius:10px; padding:0.85rem 1rem; margin-bottom:1.2rem; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                  <div style="font-size:0.72rem; text-transform:uppercase; font-weight:700; color:var(--gray-500); letter-spacing:0.04em;">Previous Meter Reading</div>
+                  <div style="font-family:'Fraunces',serif; font-size:1.45rem; font-weight:700; color:var(--ink-900);" id="prev-reading-val">0.00 m³</div>
+                  <div style="font-size:0.72rem; color:var(--gray-400); font-family:'IBM Plex Mono',monospace;" id="prev-reading-meta">Initial base reading</div>
+                </div>
+                <div style="text-align:right;">
+                  <div style="font-size:0.72rem; text-transform:uppercase; font-weight:700; color:var(--gray-500);">Meter Number</div>
+                  <div style="font-family:'IBM Plex Mono',monospace; font-size:0.95rem; font-weight:600; color:var(--marine-600);" id="meter-num-display">—</div>
+                </div>
+              </div>
+
+              <form id="meter-submit-form" onsubmit="handleMeterSubmit(event)">
+                <div class="form-group">
+                  <label for="current-reading-input">Current Meter Reading (in cubic meters — m³)</label>
+                  <input type="number" step="0.01" min="0" id="current-reading-input" placeholder="e.g. 135.50" required oninput="handleLiveCalc()" />
+                  <p class="hint" id="reading-hint">Enter the latest digits showing on your physical water meter dial.</p>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="meter-serial-input">Meter Number / ID <span style="font-weight:400; color:var(--gray-400);">(optional)</span></label>
+                    <input type="text" id="meter-serial-input" placeholder="e.g. MTR-2041" />
+                  </div>
+                  <div class="form-group">
+                    <label for="meter-notes-input">Notes / Remarks <span style="font-weight:400; color:var(--gray-400);">(optional)</span></label>
+                    <input type="text" id="meter-notes-input" placeholder="e.g. Regular monthly read" />
+                  </div>
+                </div>
+
+                <!-- Live Bill Preview -->
+                <div class="calc-preview" id="live-calc-box" style="display:none;">
+                  <div class="calc-preview-head">
+                    <span>⚡ Live Bill Estimation</span>
+                    <span style="font-size:0.72rem; font-family:'IBM Plex Mono',monospace; color:var(--gray-500);">Instant Preview</span>
+                  </div>
+                  <div class="calc-preview-rows">
+                    <div class="calc-preview-row">
+                      <span>Water Consumed:</span>
+                      <strong id="calc-units">0.00 m³</strong>
+                    </div>
+                    <div class="calc-preview-row">
+                      <span>Base Standing / Service Fee:</span>
+                      <span>KSh 50.00</span>
+                    </div>
+                    <div class="calc-preview-row">
+                      <span>Tiered Water Usage Charge:</span>
+                      <span id="calc-water-charge">KSh 0.00</span>
+                    </div>
+                    <div class="calc-preview-total">
+                      <span>Estimated Amount to Pay:</span>
+                      <span id="calc-total-amount" style="color:var(--marine-600);">KSh 50.00</span>
+                    </div>
+                  </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary" id="btn-submit-reading" style="width:100%; padding:0.75rem;">
+                  Submit Reading &amp; Calculate Bill
+                </button>
+              </form>
+            </div>
+          </div>
+
+          <!-- Tariff / Rate Card Info Card -->
+          <div class="card" style="margin-bottom:0;">
+            <div class="card-head">
+              <h3>Water Tariff &amp; Billing Rates</h3>
+            </div>
+            <div class="card-body">
+              <p style="font-size:0.83rem; color:var(--gray-500); line-height:1.5; margin-bottom:1rem;">
+                Water consumption is calculated progressively based on approved community board tiers, plus a fixed standing service fee:
+              </p>
+              <div style="background:var(--sky-50); border-radius:10px; border:1px solid var(--line-soft); overflow:hidden;">
+                <table style="font-size:0.82rem;">
+                  <thead>
+                    <tr><th>Consumption Block</th><th>Tariff Rate</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr><td>Base Service Fee (Monthly)</td><td><strong>KSh 50.00</strong> flat</td></tr>
+                    <tr><td>Tier 1 (0 – 6 m³ Lifeline)</td><td><strong>KSh 45.00</strong> / m³</td></tr>
+                    <tr><td>Tier 2 (7 – 20 m³ Normal)</td><td><strong>KSh 65.00</strong> / m³</td></tr>
+                    <tr><td>Tier 3 (21 – 50 m³ High)</td><td><strong>KSh 85.00</strong> / m³</td></tr>
+                    <tr><td>Tier 4 (&gt; 50 m³ Commercial)</td><td><strong>KSh 110.00</strong> / m³</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div style="margin-top:1.2rem; padding:0.9rem; border-radius:9px; background:var(--gold-100); border:1px solid #ebd9ab; font-size:0.78rem; color:var(--ink-900);">
+                💡 <strong>Instant Reply:</strong> When you submit your meter reading, your bill is computed immediately. An official reply notice and breakdown are generated with M-Pesa payment details and a 14-day payment window.
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Meter Submissions and Bills History Table -->
+        <div class="card">
+          <div class="card-head">
+            <h3>My Meter Readings &amp; Bills History</h3>
+          </div>
+          <div class="card-body" style="padding:0; overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Meter No.</th>
+                  <th>Previous</th>
+                  <th>Current</th>
+                  <th>Consumed</th>
+                  <th>Amount</th>
+                  <th>Due Date</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="meter-history-tbody">
+                <tr><td colspan="9" class="empty-state">Loading history…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ── ADMIN METER & BILLING PANEL ── -->
+      <div class="panel" id="panel-admin-bills">
+        <div class="stat-grid" id="admin-bill-stats"></div>
+        <div class="card">
+          <div class="card-head">
+            <h3>Member Meter Readings &amp; Invoices</h3>
+            <div style="display:flex; gap:0.5rem;">
+              <select id="admin-bill-filter" onchange="renderAdminBillsTable()" style="padding:0.4rem 0.7rem; font-size:0.8rem; border-radius:7px; border:1px solid var(--line);">
+                <option value="all">All Statuses</option>
+                <option value="unpaid">Unpaid Only</option>
+                <option value="paid">Paid Only</option>
+              </select>
+            </div>
+          </div>
+          <div class="card-body" style="padding:0; overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Member / Contact</th>
+                  <th>Zone</th>
+                  <th>Meter</th>
+                  <th>Date</th>
+                  <th>Reading</th>
+                  <th>Consumed</th>
+                  <th>Total Due</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="admin-bills-tbody">
+                <tr><td colspan="9" class="empty-state">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
     </div><!-- /content -->
@@ -504,6 +759,92 @@
   </div>
 </div>
 
+<!-- ── BILL REPLY & INVOICE MODAL ── -->
+<div class="modal-overlay" id="bill-reply-modal">
+  <div class="modal" style="max-width:540px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom:1px solid var(--line-soft); padding-bottom:0.75rem;">
+      <div>
+        <h3 style="margin-bottom:0.15rem; font-size:1.15rem; color:var(--ink-900);">Maji Smart Water Utility</h3>
+        <p style="font-size:0.72rem; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.04em;">Official Billing Statement &amp; Reply</p>
+      </div>
+      <span id="modal-bill-status-badge" class="badge-status"></span>
+    </div>
+
+    <!-- Official SMS/Notice Box -->
+    <div style="margin-bottom:1.1rem;">
+      <label style="font-size:0.72rem; font-weight:700; text-transform:uppercase; color:var(--marine-600); letter-spacing:0.05em; display:block; margin-bottom:0.3rem;">
+        📩 Official Reply Sent to Member:
+      </label>
+      <div id="modal-reply-text" class="reply-message-box" style="margin:0;"></div>
+    </div>
+
+    <!-- Bill Details Breakdown Card -->
+    <div style="background:var(--paper); border:1px solid var(--line); border-radius:12px; padding:1.1rem; margin-bottom:1rem;">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.6rem; font-size:0.8rem; margin-bottom:0.8rem;">
+        <div><span style="color:var(--gray-500);">Customer:</span> <strong id="modal-bill-user">—</strong></div>
+        <div><span style="color:var(--gray-500);">Account:</span> <strong id="modal-bill-acc">—</strong></div>
+        <div><span style="color:var(--gray-500);">Meter Serial:</span> <strong id="modal-bill-meter">—</strong></div>
+        <div><span style="color:var(--gray-500);">Reading Date:</span> <span id="modal-bill-date">—</span></div>
+      </div>
+
+      <table style="font-size:0.82rem; margin-bottom:0.8rem;">
+        <thead>
+          <tr><th>Item / Description</th><th>Qty / Units</th><th>Rate</th><th>Amount</th></tr>
+        </thead>
+        <tbody id="modal-bill-breakdown-tbody">
+        </tbody>
+      </table>
+
+      <div class="invoice-total-highlight" style="margin:0.5rem 0;">
+        <div class="label">Total Amount Due</div>
+        <div class="amount" id="modal-bill-total">KSh 0.00</div>
+        <div style="font-size:0.75rem; color:var(--gray-500); font-family:'IBM Plex Mono',monospace; margin-top:0.2rem;" id="modal-bill-due"></div>
+      </div>
+    </div>
+
+    <!-- Payment info -->
+    <div class="paybill-box">
+      <div style="font-weight:700; margin-bottom:0.25rem;">📱 Payment Instructions (M-Pesa Paybill):</div>
+      <div>Business Number: <strong>247247</strong> &nbsp;|&nbsp; Account: <strong id="modal-paybill-acc"></strong></div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('bill-reply-modal')">Close</button>
+      <button class="btn btn-outline" onclick="window.print()">Print Receipt</button>
+      <button class="btn btn-primary" id="modal-pay-now-btn" onclick="openMpesaFromModal()">Pay via M-Pesa</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── SIMULATED M-PESA PAYMENT MODAL ── -->
+<div class="modal-overlay" id="mpesa-modal">
+  <div class="modal" style="max-width:440px;">
+    <h3 style="margin-bottom:0.5rem;">Lipa na M-Pesa Online</h3>
+    <p style="font-size:0.82rem; color:var(--gray-500); margin-bottom:1.2rem;">Complete your water bill payment instantly.</p>
+    <div class="alert error" id="mpesa-alert"></div>
+    <input type="hidden" id="mpesa-bill-id" />
+
+    <div style="background:var(--sky-50); border:1px solid var(--azure-100); border-radius:12px; padding:1rem; margin-bottom:1.2rem; text-align:center;">
+      <div style="font-size:0.75rem; color:var(--gray-500); text-transform:uppercase; font-weight:700;">Amount to Pay</div>
+      <div style="font-family:'Fraunces',serif; font-size:2rem; font-weight:700; color:var(--marine-600);" id="mpesa-amount-display">KSh 0.00</div>
+      <div style="font-size:0.78rem; color:var(--gray-500); font-family:'IBM Plex Mono',monospace; margin-top:0.2rem;">
+        Paybill: <strong>247247</strong> &nbsp;|&nbsp; Acc: <span id="mpesa-acc-display">—</span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="mpesa-phone-input">M-Pesa Phone Number</label>
+      <input type="tel" id="mpesa-phone-input" placeholder="e.g. 0712345678" />
+      <p class="hint">An STK prompt will be simulated to confirm payment.</p>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('mpesa-modal')">Cancel</button>
+      <button class="btn btn-primary" id="btn-confirm-mpesa" onclick="executeMpesaPayment()">Confirm &amp; Pay</button>
+    </div>
+  </div>
+</div>
+
 <script>
   let currentUser = null;
   let zonesData   = [];
@@ -532,8 +873,17 @@
   }
 
   // ── Panels ────────────────────────────────────────────────────────────────
-  const panels = ['home','schedules','announcements','zones','users','reports'];
-  const titles  = { home:'Dashboard', schedules:'Water Schedules', announcements:'Announcements', zones:'Manage Zones', users:'Users', reports:'Reports' };
+  const panels = ['home','schedules','announcements','meter','admin-bills','zones','users','reports'];
+  const titles  = {
+    home:'Dashboard',
+    schedules:'Water Schedules',
+    announcements:'Announcements',
+    meter:'Meter Readings & Billing',
+    'admin-bills':'Meter & Billing Management',
+    zones:'Manage Zones',
+    users:'Users',
+    reports:'Reports'
+  };
 
   function showPanel(name) {
     panels.forEach(p => {
@@ -545,6 +895,8 @@
 
     if (name === 'schedules')     loadSchedules();
     if (name === 'announcements') loadAnnouncements();
+    if (name === 'meter')         loadMeterPanel();
+    if (name === 'admin-bills')   loadAdminBills();
     if (name === 'zones')         loadZones();
     if (name === 'users')         loadUsers();
     if (name === 'reports')       loadReports();
@@ -559,6 +911,8 @@
       const rep = await r.json();
       document.getElementById('home-stats').innerHTML = `
         <div class="stat-card"><div class="label">Registered Users</div><div class="value">${rep.totalUsers}</div></div>
+        <div class="stat-card"><div class="label">Total Meter Readings</div><div class="value">${rep.totalReadings || 0}</div></div>
+        <div class="stat-card"><div class="label">Total Billed</div><div class="value">KSh ${Number(rep.billingStats?.total_billed || 0).toLocaleString()}</div><div class="sub">Paid: KSh ${Number(rep.billingStats?.total_paid || 0).toLocaleString()}</div></div>
         <div class="stat-card"><div class="label">Total Schedules</div><div class="value">${rep.totalSchedules}</div></div>
         <div class="stat-card"><div class="label">Announcements</div><div class="value">${rep.totalAnnouncements}</div></div>
         <div class="stat-card"><div class="label">Zones</div><div class="value">${zonesData.length}</div></div>
@@ -575,6 +929,40 @@
       } else {
         document.getElementById('next-schedule-label').textContent = 'No upcoming schedules';
         document.getElementById('next-schedule-detail').textContent = 'Check back later.';
+      }
+
+      // Load user meter and billing summary for home cards
+      try {
+        const msRes = await fetch('/api/meter/status');
+        const ms = await msRes.json();
+        latestMeterStatus = ms;
+        const billStatusHtml = ms.latestBill
+          ? `<div class="stat-card" style="cursor:pointer;" onclick="showPanel('meter')">
+              <div class="label">Current Bill Status</div>
+              <div class="value" style="font-size:1.6rem;"><span class="badge-status badge-${ms.latestBill.status}">${ms.latestBill.status.toUpperCase()}</span></div>
+              <div class="sub">Amount: KSh ${ms.latestBill.total_amount.toFixed(2)} · Click to view</div>
+            </div>`
+          : `<div class="stat-card" style="cursor:pointer;" onclick="showPanel('meter')">
+              <div class="label">Billing Status</div>
+              <div class="value" style="font-size:1.6rem;">No Bills</div>
+              <div class="sub">Click to submit reading</div>
+            </div>`;
+
+        document.getElementById('home-stats').innerHTML = `
+          <div class="stat-card">
+            <div class="label">My Service Zone</div>
+            <div class="value" style="font-size:1.7rem;">${esc(currentUser.zone || 'None')}</div>
+            <div class="sub">Active Account</div>
+          </div>
+          <div class="stat-card" style="cursor:pointer;" onclick="showPanel('meter')">
+            <div class="label">Last Meter Reading</div>
+            <div class="value" style="font-size:1.7rem;">${ms.latestReading.toFixed(2)} m³</div>
+            <div class="sub">${ms.latestDate ? fmtDate(ms.latestDate) : 'No reading yet'}</div>
+          </div>
+          ${billStatusHtml}
+        `;
+      } catch (err) {
+        console.error('Home meter status error:', err);
       }
     }
 
@@ -751,12 +1139,463 @@
     const rep = await r.json();
     document.getElementById('report-stats').innerHTML = `
       <div class="stat-card"><div class="label">Total Users</div><div class="value">${rep.totalUsers}</div></div>
+      <div class="stat-card"><div class="label">Meter Readings</div><div class="value">${rep.totalReadings || 0}</div></div>
+      <div class="stat-card"><div class="label">Total Billed Revenue</div><div class="value">KSh ${Number(rep.billingStats?.total_billed || 0).toLocaleString()}</div><div class="sub">Collected: KSh ${Number(rep.billingStats?.total_paid || 0).toLocaleString()}</div></div>
       <div class="stat-card"><div class="label">Total Schedules</div><div class="value">${rep.totalSchedules}</div></div>
       <div class="stat-card"><div class="label">Announcements</div><div class="value">${rep.totalAnnouncements}</div></div>
     `;
     document.getElementById('zone-stats-tbody').innerHTML = rep.zoneStats.map(z => `
       <tr><td>${esc(z.name)}</td><td>${z.schedule_count}</td></tr>
     `).join('');
+  }
+
+  // ── Meter & Billing (Member) ──────────────────────────────────────────────
+  let latestMeterStatus = null;
+  let memberMeterHistory = [];
+  let currentActiveBill = null;
+  let modalCurrentBill = null;
+
+  function calculateWaterBill(units) {
+    const unitsNum = Math.max(0, parseFloat(units) || 0);
+    const baseFee = 50.00;
+    let charge = 0;
+    const breakdown = [];
+    let remaining = unitsNum;
+
+    // Tier 1: 0 - 6 m³ @ 45 KSh/m³
+    const t1 = Math.min(remaining, 6);
+    if (t1 > 0) {
+      const cost = Math.round(t1 * 45 * 100) / 100;
+      charge += cost;
+      breakdown.push({ tier: 'Tier 1 (0–6 m³)', units: Math.round(t1 * 100) / 100, rate: 45, cost });
+      remaining -= t1;
+    }
+
+    // Tier 2: 7 - 20 m³ @ 65 KSh/m³ (up to 14 units)
+    if (remaining > 0) {
+      const t2 = Math.min(remaining, 14);
+      const cost = Math.round(t2 * 65 * 100) / 100;
+      charge += cost;
+      breakdown.push({ tier: 'Tier 2 (7–20 m³)', units: Math.round(t2 * 100) / 100, rate: 65, cost });
+      remaining -= t2;
+    }
+
+    // Tier 3: 21 - 50 m³ @ 85 KSh/m³ (up to 30 units)
+    if (remaining > 0) {
+      const t3 = Math.min(remaining, 30);
+      const cost = Math.round(t3 * 85 * 100) / 100;
+      charge += cost;
+      breakdown.push({ tier: 'Tier 3 (21–50 m³)', units: Math.round(t3 * 100) / 100, rate: 85, cost });
+      remaining -= t3;
+    }
+
+    // Tier 4: > 50 m³ @ 110 KSh/m³
+    if (remaining > 0) {
+      const t4 = remaining;
+      const cost = Math.round(t4 * 110 * 100) / 100;
+      charge += cost;
+      breakdown.push({ tier: 'Tier 4 (>50 m³)', units: Math.round(t4 * 100) / 100, rate: 110, cost });
+    }
+
+    const consumptionCharge = Math.round(charge * 100) / 100;
+    const totalAmount = Math.round((baseFee + consumptionCharge) * 100) / 100;
+
+    return {
+      units: Math.round(unitsNum * 100) / 100,
+      baseFee,
+      consumptionCharge,
+      totalAmount,
+      breakdown
+    };
+  }
+
+  async function loadMeterPanel() {
+    try {
+      // 1. Fetch current status
+      const res = await fetch('/api/meter/status');
+      latestMeterStatus = await res.json();
+
+      const prevVal = Number(latestMeterStatus.latestReading || 0);
+      document.getElementById('prev-reading-val').textContent = `${prevVal.toFixed(2)} m³`;
+      document.getElementById('prev-reading-meta').textContent = latestMeterStatus.latestDate
+        ? `Recorded ${fmtDate(latestMeterStatus.latestDate)}`
+        : 'Initial meter baseline';
+      document.getElementById('meter-num-display').textContent = latestMeterStatus.meterNumber || 'Not assigned';
+      document.getElementById('meter-serial-input').value = latestMeterStatus.meterNumber || '';
+
+      const curInput = document.getElementById('current-reading-input');
+      curInput.min = prevVal;
+      curInput.value = '';
+      document.getElementById('live-calc-box').style.display = 'none';
+
+      // 2. Fetch history
+      const hRes = await fetch('/api/meter/history');
+      memberMeterHistory = await hRes.json();
+      renderMeterHistoryTable();
+
+      // 3. Render latest bill notice card
+      const noticeCard = document.getElementById('latest-bill-notice-card');
+      if (memberMeterHistory.length && memberMeterHistory[0].bill_id) {
+        const top = memberMeterHistory[0];
+        currentActiveBill = top;
+        noticeCard.style.display = 'block';
+        document.getElementById('latest-reply-heading').textContent = `Official Bill Reply — ${fmtDate(top.reading_date)}`;
+        document.getElementById('latest-reply-date').textContent = `Meter: ${esc(top.meter_number || '—')} | Acc: WAT-${currentUser.id}`;
+        document.getElementById('latest-reply-amount').textContent = `KSh ${Number(top.total_amount).toFixed(2)}`;
+        
+        const stEl = document.getElementById('latest-reply-status');
+        stEl.className = `badge-status badge-${top.bill_status}`;
+        stEl.textContent = top.bill_status.toUpperCase();
+
+        document.getElementById('latest-reply-text').textContent = top.reply_message || 'Bill generated.';
+        document.getElementById('latest-reply-acc').textContent = `WAT-${currentUser.id}`;
+
+        const payBtn = document.getElementById('latest-reply-pay-btn');
+        if (top.bill_status === 'paid') {
+          payBtn.style.display = 'none';
+        } else {
+          payBtn.style.display = 'inline-block';
+        }
+      } else {
+        noticeCard.style.display = 'none';
+      }
+    } catch (err) {
+      console.error('Failed to load meter panel:', err);
+    }
+  }
+
+  function handleLiveCalc() {
+    const inputVal = parseFloat(document.getElementById('current-reading-input').value);
+    const prevVal  = Number(latestMeterStatus?.latestReading || 0);
+    const calcBox  = document.getElementById('live-calc-box');
+    const hint     = document.getElementById('reading-hint');
+
+    if (isNaN(inputVal) || inputVal < 0) {
+      calcBox.style.display = 'none';
+      hint.textContent = 'Enter the latest digits showing on your physical water meter dial.';
+      hint.style.color = '';
+      return;
+    }
+
+    if (inputVal < prevVal) {
+      calcBox.style.display = 'none';
+      hint.textContent = `⚠️ Reading cannot be lower than previous reading (${prevVal.toFixed(2)} m³).`;
+      hint.style.color = 'var(--error)';
+      return;
+    }
+
+    hint.textContent = 'Valid reading. See estimated bill calculation below:';
+    hint.style.color = 'var(--success)';
+    calcBox.style.display = 'block';
+
+    const consumption = Math.round((inputVal - prevVal) * 100) / 100;
+    const calc = calculateWaterBill(consumption);
+
+    document.getElementById('calc-units').textContent = `${consumption.toFixed(2)} m³`;
+    document.getElementById('calc-water-charge').textContent = `KSh ${calc.consumptionCharge.toFixed(2)}`;
+    document.getElementById('calc-total-amount').textContent = `KSh ${calc.totalAmount.toFixed(2)}`;
+  }
+
+  async function handleMeterSubmit(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btn-submit-reading');
+    const currentReading = document.getElementById('current-reading-input').value;
+    const meterNumber    = document.getElementById('meter-serial-input').value.trim();
+    const notes          = document.getElementById('meter-notes-input').value.trim();
+
+    btn.disabled = true;
+    btn.textContent = 'Calculating & Submitting…';
+
+    try {
+      const res = await fetch('/api/meter/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          current_reading: currentReading,
+          meter_number: meterNumber,
+          notes: notes
+        })
+      });
+
+      const data = await res.json();
+      btn.disabled = false;
+      btn.textContent = 'Submit Reading & Calculate Bill';
+
+      if (!res.ok) {
+        showModalAlert('meter-form-alert', data.error || 'Failed to submit meter reading', 'error');
+        return;
+      }
+
+      // Open official reply invoice modal immediately!
+      openBillReplyModal(data.reply);
+
+      // Refresh panel
+      await loadMeterPanel();
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = 'Submit Reading & Calculate Bill';
+      showModalAlert('meter-form-alert', 'Network error. Please try again.', 'error');
+    }
+  }
+
+  function renderMeterHistoryTable() {
+    const tb = document.getElementById('meter-history-tbody');
+    if (!memberMeterHistory.length) {
+      tb.innerHTML = '<tr><td colspan="9" class="empty-state"><div class="icon">💧</div>No meter readings recorded yet. Submit your first reading above!</td></tr>';
+      return;
+    }
+
+    tb.innerHTML = memberMeterHistory.map(item => `
+      <tr>
+        <td>${fmtDate(item.reading_date)}</td>
+        <td><strong>${esc(item.meter_number || '—')}</strong></td>
+        <td>${Number(item.previous_reading).toFixed(2)} m³</td>
+        <td>${Number(item.current_reading).toFixed(2)} m³</td>
+        <td><strong>${Number(item.consumption).toFixed(2)} m³</strong></td>
+        <td style="font-weight:700; color:var(--marine-600);">KSh ${Number(item.total_amount || 0).toFixed(2)}</td>
+        <td>${item.due_date ? fmtDate(item.due_date) : '—'}</td>
+        <td><span class="badge-status badge-${item.bill_status || 'unpaid'}">${(item.bill_status || 'unpaid').toUpperCase()}</span></td>
+        <td>
+          <button class="btn btn-outline btn-sm" onclick="viewHistoryBillModal(${JSON.stringify(item).replace(/"/g,'&quot;')})">View Reply</button>
+          ${item.bill_status === 'unpaid' ? `<button class="btn btn-primary btn-sm" onclick="openMpesaModal(${item.bill_id}, ${item.total_amount}, 'WAT-${currentUser.id}')">Pay</button>` : ''}
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function openBillReplyModal(reply) {
+    modalCurrentBill = reply;
+    document.getElementById('modal-bill-status-badge').className = `badge-status badge-${reply.status || 'unpaid'}`;
+    document.getElementById('modal-bill-status-badge').textContent = (reply.status || 'unpaid').toUpperCase();
+    document.getElementById('modal-reply-text').textContent = reply.replyMessage || '';
+    document.getElementById('modal-bill-user').textContent = reply.userName || currentUser.full_name;
+    document.getElementById('modal-bill-acc').textContent = reply.accountNumber || `WAT-${currentUser.id}`;
+    document.getElementById('modal-bill-meter').textContent = reply.meterNumber || '—';
+    document.getElementById('modal-bill-date').textContent = fmtDate(reply.readingDate);
+    document.getElementById('modal-paybill-acc').textContent = reply.accountNumber || `WAT-${currentUser.id}`;
+
+    // Breakdown table
+    const tbody = document.getElementById('modal-bill-breakdown-tbody');
+    let rows = `<tr><td>Base Standing Service Charge</td><td>1 month</td><td>Fixed</td><td>KSh ${Number(reply.baseFee || 50).toFixed(2)}</td></tr>`;
+    if (reply.breakdown && reply.breakdown.length) {
+      reply.breakdown.forEach(b => {
+        rows += `<tr><td>Water Usage — ${esc(b.tier)}</td><td>${b.units} m³</td><td>KSh ${b.rate}/m³</td><td>KSh ${Number(b.cost).toFixed(2)}</td></tr>`;
+      });
+    } else {
+      rows += `<tr><td>Water Consumption Usage</td><td>${reply.consumption} m³</td><td>Tiered</td><td>KSh ${Number(reply.consumptionCharge || 0).toFixed(2)}</td></tr>`;
+    }
+    tbody.innerHTML = rows;
+
+    document.getElementById('modal-bill-total').textContent = `KSh ${Number(reply.totalAmount).toFixed(2)}`;
+    document.getElementById('modal-bill-due').textContent = reply.dueDateFormatted
+      ? `Due Date: ${reply.dueDateFormatted}`
+      : (reply.dueDate ? `Due Date: ${fmtDate(reply.dueDate)}` : '');
+
+    const payBtn = document.getElementById('modal-pay-now-btn');
+    if (reply.status === 'paid') {
+      payBtn.style.display = 'none';
+    } else {
+      payBtn.style.display = 'inline-block';
+    }
+
+    openModal('bill-reply-modal');
+  }
+
+  function openInvoiceModalFromLatest() {
+    if (!currentActiveBill) return;
+    const calc = calculateWaterBill(Number(currentActiveBill.consumption));
+    openBillReplyModal({
+      billId: currentActiveBill.bill_id,
+      status: currentActiveBill.bill_status,
+      replyMessage: currentActiveBill.reply_message,
+      userName: currentUser.full_name,
+      accountNumber: `WAT-${currentUser.id}`,
+      meterNumber: currentActiveBill.meter_number,
+      readingDate: currentActiveBill.reading_date,
+      baseFee: currentActiveBill.base_fee || 50,
+      consumption: Number(currentActiveBill.consumption),
+      consumptionCharge: currentActiveBill.consumption_charge || calc.consumptionCharge,
+      totalAmount: currentActiveBill.total_amount,
+      breakdown: calc.breakdown,
+      dueDate: currentActiveBill.due_date
+    });
+  }
+
+  function viewHistoryBillModal(item) {
+    const calc = calculateWaterBill(Number(item.consumption));
+    openBillReplyModal({
+      billId: item.bill_id,
+      status: item.bill_status,
+      replyMessage: item.reply_message,
+      userName: currentUser.full_name,
+      accountNumber: `WAT-${currentUser.id}`,
+      meterNumber: item.meter_number,
+      readingDate: item.reading_date,
+      baseFee: item.base_fee || 50,
+      consumption: Number(item.consumption),
+      consumptionCharge: item.consumption_charge || calc.consumptionCharge,
+      totalAmount: item.total_amount,
+      breakdown: calc.breakdown,
+      dueDate: item.due_date
+    });
+  }
+
+  function openMpesaPayModalFromLatest() {
+    if (!currentActiveBill) return;
+    openMpesaModal(currentActiveBill.bill_id, currentActiveBill.total_amount, `WAT-${currentUser.id}`);
+  }
+
+  function openMpesaFromModal() {
+    if (!modalCurrentBill) return;
+    openMpesaModal(modalCurrentBill.billId, modalCurrentBill.totalAmount, modalCurrentBill.accountNumber || `WAT-${currentUser.id}`);
+  }
+
+  function openMpesaModal(billId, amount, acc) {
+    document.getElementById('mpesa-bill-id').value = billId;
+    document.getElementById('mpesa-amount-display').textContent = `KSh ${Number(amount).toFixed(2)}`;
+    document.getElementById('mpesa-acc-display').textContent = acc;
+    document.getElementById('mpesa-phone-input').value = currentUser.phone || '';
+    document.getElementById('mpesa-alert').className = 'alert error';
+    document.getElementById('mpesa-alert').style.display = 'none';
+    openModal('mpesa-modal');
+  }
+
+  async function executeMpesaPayment() {
+    const billId = document.getElementById('mpesa-bill-id').value;
+    const phone  = document.getElementById('mpesa-phone-input').value.trim();
+    const btn    = document.getElementById('btn-confirm-mpesa');
+
+    if (!phone) {
+      showModalAlert('mpesa-alert', 'Please enter your M-Pesa phone number.', 'error');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Simulating STK & Processing…';
+
+    try {
+      const res = await fetch(`/api/bills/${billId}/pay`, { method: 'POST' });
+      const data = await res.json();
+      btn.disabled = false;
+      btn.textContent = 'Confirm & Pay';
+
+      if (!res.ok) {
+        showModalAlert('mpesa-alert', data.error || 'Payment failed', 'error');
+        return;
+      }
+
+      showModalAlert('mpesa-alert', '✅ M-Pesa Payment confirmed! Bill marked as paid.', 'success');
+      setTimeout(() => {
+        closeModal('mpesa-modal');
+        closeModal('bill-reply-modal');
+        if (currentUser.role === 'admin') {
+          loadAdminBills();
+        } else {
+          loadMeterPanel();
+        }
+      }, 1200);
+    } catch {
+      btn.disabled = false;
+      btn.textContent = 'Confirm & Pay';
+      showModalAlert('mpesa-alert', 'Network error. Please try again.', 'error');
+    }
+  }
+
+  // ── Admin: Meter & Billing Mgmt ───────────────────────────────────────────
+  let adminBillsList = [];
+
+  async function loadAdminBills() {
+    try {
+      const res = await fetch('/api/admin/bills');
+      adminBillsList = await res.json();
+
+      // Compute stats
+      let totalBilled = 0;
+      let totalPaid   = 0;
+      let totalUnpaid = 0;
+      adminBillsList.forEach(b => {
+        const amt = Number(b.total_amount || 0);
+        totalBilled += amt;
+        if (b.status === 'paid') totalPaid += amt;
+        else totalUnpaid += amt;
+      });
+
+      document.getElementById('admin-bill-stats').innerHTML = `
+        <div class="stat-card"><div class="label">Total Readings Submitted</div><div class="value">${adminBillsList.length}</div></div>
+        <div class="stat-card"><div class="label">Total Billed</div><div class="value">KSh ${totalBilled.toLocaleString()}</div></div>
+        <div class="stat-card"><div class="label">Total Collected (Paid)</div><div class="value" style="color:var(--success);">KSh ${totalPaid.toLocaleString()}</div></div>
+        <div class="stat-card"><div class="label">Outstanding (Unpaid)</div><div class="value" style="color:var(--error);">KSh ${totalUnpaid.toLocaleString()}</div></div>
+      `;
+
+      renderAdminBillsTable();
+    } catch (err) {
+      console.error('Failed to load admin bills:', err);
+    }
+  }
+
+  function renderAdminBillsTable() {
+    const filter = document.getElementById('admin-bill-filter')?.value || 'all';
+    const tb     = document.getElementById('admin-bills-tbody');
+
+    const filtered = adminBillsList.filter(b => {
+      if (filter === 'all') return true;
+      return b.status === filter;
+    });
+
+    if (!filtered.length) {
+      tb.innerHTML = '<tr><td colspan="9" class="empty-state">No bills found matching this filter.</td></tr>';
+      return;
+    }
+
+    tb.innerHTML = filtered.map(b => `
+      <tr>
+        <td>
+          <strong>${esc(b.user_name)}</strong><br/>
+          <small style="color:var(--gray-500); font-family:'IBM Plex Mono',monospace;">${esc(b.user_email)} ${b.user_phone ? '· ' + esc(b.user_phone) : ''}</small>
+        </td>
+        <td><span class="badge" style="font-size:0.7rem;">${esc(b.user_zone || '—')}</span></td>
+        <td style="font-family:'IBM Plex Mono',monospace;">${esc(b.meter_number || '—')}</td>
+        <td>${fmtDate(b.created_at)}</td>
+        <td>${Number(b.current_reading || 0).toFixed(2)} m³</td>
+        <td><strong>${Number(b.consumption || 0).toFixed(2)} m³</strong></td>
+        <td style="font-weight:700; color:var(--marine-600);">KSh ${Number(b.total_amount).toFixed(2)}</td>
+        <td><span class="badge-status badge-${b.status}">${b.status.toUpperCase()}</span></td>
+        <td>
+          <button class="btn btn-outline btn-sm" onclick="viewAdminBillInvoice(${JSON.stringify(b).replace(/"/g,'&quot;')})">Reply Details</button>
+          <button class="btn btn-sm ${b.status==='paid'?'btn-outline':'btn-teal'}" onclick="toggleBillStatus(${b.id}, '${b.status==='paid'?'unpaid':'paid'}')">
+            Mark as ${b.status==='paid'?'Unpaid':'Paid'}
+          </button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  async function toggleBillStatus(id, newStatus) {
+    await fetch(`/api/admin/bills/${id}/status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus })
+    });
+    loadAdminBills();
+  }
+
+  function viewAdminBillInvoice(b) {
+    const calc = calculateWaterBill(Number(b.consumption || 0));
+    openBillReplyModal({
+      billId: b.id,
+      status: b.status,
+      replyMessage: b.reply_message,
+      userName: b.user_name,
+      accountNumber: `WAT-${b.user_id}`,
+      meterNumber: b.meter_number,
+      readingDate: b.created_at,
+      baseFee: b.base_fee || 50,
+      consumption: Number(b.consumption || 0),
+      consumptionCharge: b.consumption_charge || calc.consumptionCharge,
+      totalAmount: b.total_amount,
+      breakdown: calc.breakdown,
+      dueDate: b.due_date
+    });
   }
 
   // ── Auth ──────────────────────────────────────────────────────────────────

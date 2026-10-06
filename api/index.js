@@ -211,10 +211,251 @@ app.post('/api/announcements', authMiddleware, adminOnly, asyncRoute(async (req,
 // ─── ADMIN: Users list ────────────────────────────────────────────────────────
 app.get('/api/admin/users', authMiddleware, adminOnly, asyncRoute(async (req, res) => {
   const users = await sql`
-    SELECT id, full_name, email, role, zone, phone, created_at
+    SELECT id, full_name, email, role, zone, phone, meter_number, created_at
     FROM users ORDER BY created_at DESC
   `;
   res.json(users.rows);
+}));
+
+// ─── WATER BILL CALCULATION HELPER ──────────────────────────────────────────
+function calculateWaterBill(units) {
+  const unitsNum = Math.max(0, parseFloat(units) || 0);
+  const baseFee = 50.00;
+  let charge = 0;
+  const breakdown = [];
+  let remaining = unitsNum;
+
+  // Tier 1: 0 - 6 m³ @ 45 KSh/m³
+  const t1 = Math.min(remaining, 6);
+  if (t1 > 0) {
+    const cost = Math.round(t1 * 45 * 100) / 100;
+    charge += cost;
+    breakdown.push({ tier: 'Tier 1 (0–6 m³)', units: Math.round(t1 * 100) / 100, rate: 45, cost });
+    remaining -= t1;
+  }
+
+  // Tier 2: 7 - 20 m³ @ 65 KSh/m³ (up to 14 units)
+  if (remaining > 0) {
+    const t2 = Math.min(remaining, 14);
+    const cost = Math.round(t2 * 65 * 100) / 100;
+    charge += cost;
+    breakdown.push({ tier: 'Tier 2 (7–20 m³)', units: Math.round(t2 * 100) / 100, rate: 65, cost });
+    remaining -= t2;
+  }
+
+  // Tier 3: 21 - 50 m³ @ 85 KSh/m³ (up to 30 units)
+  if (remaining > 0) {
+    const t3 = Math.min(remaining, 30);
+    const cost = Math.round(t3 * 85 * 100) / 100;
+    charge += cost;
+    breakdown.push({ tier: 'Tier 3 (21–50 m³)', units: Math.round(t3 * 100) / 100, rate: 85, cost });
+    remaining -= t3;
+  }
+
+  // Tier 4: > 50 m³ @ 110 KSh/m³
+  if (remaining > 0) {
+    const t4 = remaining;
+    const cost = Math.round(t4 * 110 * 100) / 100;
+    charge += cost;
+    breakdown.push({ tier: 'Tier 4 (>50 m³)', units: Math.round(t4 * 100) / 100, rate: 110, cost });
+  }
+
+  const consumptionCharge = Math.round(charge * 100) / 100;
+  const totalAmount = Math.round((baseFee + consumptionCharge) * 100) / 100;
+
+  return {
+    units: Math.round(unitsNum * 100) / 100,
+    baseFee,
+    consumptionCharge,
+    totalAmount,
+    breakdown
+  };
+}
+
+// ─── METER READINGS & BILLING ROUTES ─────────────────────────────────────────
+
+// Member: Get latest meter reading status & previous value
+app.get('/api/meter/status', authMiddleware, asyncRoute(async (req, res) => {
+  const lastReading = await sql`
+    SELECT mr.*, b.id as bill_id, b.total_amount, b.status as bill_status, b.due_date, b.reply_message
+    FROM meter_readings mr
+    LEFT JOIN bills b ON b.reading_id = mr.id
+    WHERE mr.user_id = ${req.user.id}
+    ORDER BY mr.reading_date DESC, mr.id DESC
+    LIMIT 1
+  `;
+
+  const userRes = await sql`SELECT meter_number FROM users WHERE id = ${req.user.id}`;
+  const userMeter = userRes.rows[0]?.meter_number || null;
+
+  if (lastReading.rows.length === 0) {
+    return res.json({
+      hasReadings: false,
+      latestReading: 0,
+      latestDate: null,
+      meterNumber: userMeter || `MTR-${String(req.user.id).padStart(4, '0')}`,
+      latestBill: null
+    });
+  }
+
+  const row = lastReading.rows[0];
+  res.json({
+    hasReadings: true,
+    latestReading: parseFloat(row.current_reading),
+    latestDate: row.reading_date,
+    meterNumber: row.meter_number || userMeter || `MTR-${String(req.user.id).padStart(4, '0')}`,
+    latestBill: row.bill_id ? {
+      id: row.bill_id,
+      total_amount: parseFloat(row.total_amount),
+      status: row.bill_status,
+      due_date: row.due_date,
+      reply_message: row.reply_message
+    } : null
+  });
+}));
+
+// Member: Get all meter readings & bills history
+app.get('/api/meter/history', authMiddleware, asyncRoute(async (req, res) => {
+  const history = await sql`
+    SELECT mr.id as reading_id, mr.previous_reading, mr.current_reading, mr.consumption,
+           mr.meter_number, mr.reading_date, mr.notes,
+           b.id as bill_id, b.base_fee, b.consumption_charge, b.total_amount,
+           b.status as bill_status, b.due_date, b.reply_message, b.paid_at
+    FROM meter_readings mr
+    LEFT JOIN bills b ON b.reading_id = mr.id
+    WHERE mr.user_id = ${req.user.id}
+    ORDER BY mr.reading_date DESC, mr.id DESC
+  `;
+  res.json(history.rows);
+}));
+
+// Member: Submit new meter reading, calculate bill, store and return instant reply
+app.post('/api/meter/submit', authMiddleware, asyncRoute(async (req, res) => {
+  const { current_reading, meter_number, notes } = req.body;
+  if (current_reading === undefined || current_reading === null || current_reading === '') {
+    return res.status(400).json({ error: 'Current meter reading is required' });
+  }
+
+  const currentVal = parseFloat(current_reading);
+  if (isNaN(currentVal) || currentVal < 0) {
+    return res.status(400).json({ error: 'Meter reading must be a valid non-negative number' });
+  }
+
+  // Get previous reading
+  const lastReadingRes = await sql`
+    SELECT current_reading, meter_number
+    FROM meter_readings
+    WHERE user_id = ${req.user.id}
+    ORDER BY reading_date DESC, id DESC
+    LIMIT 1
+  `;
+
+  const previousVal = lastReadingRes.rows.length ? parseFloat(lastReadingRes.rows[0].current_reading) : 0;
+  if (currentVal < previousVal) {
+    return res.status(400).json({
+      error: `New reading (${currentVal} m³) cannot be lower than your previous reading (${previousVal} m³)`
+    });
+  }
+
+  const consumption = Math.round((currentVal - previousVal) * 100) / 100;
+  const meterNum = meter_number?.trim() || lastReadingRes.rows[0]?.meter_number || `MTR-${String(req.user.id).padStart(4, '0')}`;
+
+  if (meter_number?.trim()) {
+    await sql`UPDATE users SET meter_number = ${meterNum} WHERE id = ${req.user.id}`;
+  }
+
+  const billCalc = calculateWaterBill(consumption);
+  const dueDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+  const dueDateFormatted = dueDate.toLocaleDateString('en-KE', { dateStyle: 'medium' });
+
+  // Formulate official instant reply
+  const replyMessage = `Dear ${req.user.full_name}, your water meter reading of ${currentVal} m³ has been recorded. Water consumed: ${consumption} m³. Standing fee: KSh ${billCalc.baseFee.toFixed(2)}. Water consumption charge: KSh ${billCalc.consumptionCharge.toFixed(2)}. Total amount to pay: KSh ${billCalc.totalAmount.toFixed(2)}. Payment due by: ${dueDateFormatted}. Paybill: 247247, Account: WAT-${req.user.id}.`;
+
+  const readingRes = await sql`
+    INSERT INTO meter_readings (user_id, previous_reading, current_reading, consumption, meter_number, notes)
+    VALUES (${req.user.id}, ${previousVal}, ${currentVal}, ${consumption}, ${meterNum}, ${notes || null})
+    RETURNING id, reading_date
+  `;
+  const readingId = readingRes.rows[0].id;
+  const readingDate = readingRes.rows[0].reading_date;
+
+  const billRes = await sql`
+    INSERT INTO bills (reading_id, user_id, units_consumed, base_fee, consumption_charge, total_amount, status, due_date, reply_message)
+    VALUES (${readingId}, ${req.user.id}, ${consumption}, ${billCalc.baseFee}, ${billCalc.consumptionCharge}, ${billCalc.totalAmount}, 'unpaid', ${dueDate}, ${replyMessage})
+    RETURNING id
+  `;
+  const billId = billRes.rows[0].id;
+
+  res.status(201).json({
+    message: 'Meter reading recorded and bill generated successfully',
+    reply: {
+      billId,
+      readingId,
+      userName: req.user.full_name,
+      meterNumber: meterNum,
+      readingDate,
+      previousReading: previousVal,
+      currentReading: currentVal,
+      consumption,
+      baseFee: billCalc.baseFee,
+      consumptionCharge: billCalc.consumptionCharge,
+      totalAmount: billCalc.totalAmount,
+      breakdown: billCalc.breakdown,
+      dueDate,
+      dueDateFormatted,
+      status: 'unpaid',
+      accountNumber: `WAT-${req.user.id}`,
+      paybill: '247247',
+      replyMessage
+    }
+  });
+}));
+
+// Member or Admin: Mark bill as paid
+app.post('/api/bills/:id/pay', authMiddleware, asyncRoute(async (req, res) => {
+  const billId = req.params.id;
+  const billQuery = req.user.role === 'admin'
+    ? await sql`SELECT * FROM bills WHERE id = ${billId}`
+    : await sql`SELECT * FROM bills WHERE id = ${billId} AND user_id = ${req.user.id}`;
+
+  if (!billQuery.rows.length) {
+    return res.status(404).json({ error: 'Bill not found' });
+  }
+
+  await sql`
+    UPDATE bills
+    SET status = 'paid', paid_at = NOW()
+    WHERE id = ${billId}
+  `;
+
+  res.json({ message: 'Payment recorded successfully! Bill marked as paid.', billId });
+}));
+
+// Admin: View all bills and meter readings across all users
+app.get('/api/admin/bills', authMiddleware, adminOnly, asyncRoute(async (req, res) => {
+  const bills = await sql`
+    SELECT b.*, mr.previous_reading, mr.current_reading, mr.consumption, mr.meter_number, mr.notes as reading_notes,
+           u.full_name as user_name, u.email as user_email, u.zone as user_zone, u.phone as user_phone
+    FROM bills b
+    LEFT JOIN meter_readings mr ON b.reading_id = mr.id
+    JOIN users u ON b.user_id = u.id
+    ORDER BY b.created_at DESC
+  `;
+  res.json(bills.rows);
+}));
+
+// Admin: Update bill status (paid / unpaid)
+app.put('/api/admin/bills/:id/status', authMiddleware, adminOnly, asyncRoute(async (req, res) => {
+  const { status } = req.body;
+  if (!['paid', 'unpaid'].includes(status)) {
+    return res.status(400).json({ error: 'Status must be paid or unpaid' });
+  }
+  if (status === 'paid') {
+    await sql`UPDATE bills SET status = 'paid', paid_at = NOW() WHERE id = ${req.params.id}`;
+  } else {
+    await sql`UPDATE bills SET status = 'unpaid', paid_at = NULL WHERE id = ${req.params.id}`;
+  }
+  res.json({ message: `Bill status updated to ${status}` });
 }));
 
 // ─── REPORTS ─────────────────────────────────────────────────────────────────
@@ -222,6 +463,15 @@ app.get('/api/admin/reports', authMiddleware, adminOnly, asyncRoute(async (req, 
   const totalUsersR = await sql`SELECT COUNT(*)::int as count FROM users WHERE role = 'user'`;
   const totalSchedulesR = await sql`SELECT COUNT(*)::int as count FROM water_schedules`;
   const totalAnnouncementsR = await sql`SELECT COUNT(*)::int as count FROM announcements`;
+  const totalReadingsR = await sql`SELECT COUNT(*)::int as count FROM meter_readings`;
+  const billingStatsR = await sql`
+    SELECT 
+      COALESCE(SUM(total_amount), 0)::numeric(12, 2) as total_billed,
+      COALESCE(SUM(CASE WHEN status = 'paid' THEN total_amount ELSE 0 END), 0)::numeric(12, 2) as total_paid,
+      COALESCE(SUM(CASE WHEN status = 'unpaid' THEN total_amount ELSE 0 END), 0)::numeric(12, 2) as total_unpaid,
+      COUNT(CASE WHEN status = 'unpaid' THEN 1 END)::int as unpaid_count
+    FROM bills
+  `;
   const zoneStatsR = await sql`
     SELECT z.name, COUNT(ws.id)::int as schedule_count
     FROM zones z
@@ -234,6 +484,8 @@ app.get('/api/admin/reports', authMiddleware, adminOnly, asyncRoute(async (req, 
     totalUsers: totalUsersR.rows[0].count,
     totalSchedules: totalSchedulesR.rows[0].count,
     totalAnnouncements: totalAnnouncementsR.rows[0].count,
+    totalReadings: totalReadingsR.rows[0].count,
+    billingStats: billingStatsR.rows[0] || { total_billed: 0, total_paid: 0, total_unpaid: 0, unpaid_count: 0 },
     zoneStats: zoneStatsR.rows
   });
 }));
